@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # Oracle Database
+  oracle:
+    image: container-registry.oracle.com/database/express:latest
+    container_name: clean-architecture-oracle
+    environment:
+      - ORACLE_PWD=your_password
+      - ORACLE_CHARACTERSET=AL32UTF8
+    ports:
+      - "1521:1521"
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+    healthcheck:
+      test: ["CMD", "sqlplus", "-L", "system/your_password@//localhost:1521/XE", "AS", "SYSDBA", "@healthcheck.sql"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Clean Architecture API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: clean-architecture-api
+    ports:
+      - "7001:80"
+      - "7002:443"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=oracle)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=XE)));User Id=system;Password=your_password;
+      - Keycloak__Authority=https://your-keycloak-server/auth/realms/your-realm
+      - Keycloak__Audience=your-client-id
+      - Keycloak__ClientSecret=your-client-secret
+    depends_on:
+      oracle:
+        condition: service_healthy
+    volumes:
+      - ./src/CleanArchitectureAPI.WebAPI/appsettings.json:/app/appsettings.json:ro
+
+volumes:
+  oracle_data:
